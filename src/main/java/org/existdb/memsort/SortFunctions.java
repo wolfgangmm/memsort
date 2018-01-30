@@ -29,26 +29,48 @@ public class SortFunctions extends BasicFunction {
 
     private static final QName QN_CREATE = new QName("create", SortModule.NAMESPACE_URI, SortModule.PREFIX);
     private static final QName QN_GET = new QName("get", SortModule.NAMESPACE_URI, SortModule.PREFIX);
+    private static final QName QN_CLEAR = new QName("clear", SortModule.NAMESPACE_URI, SortModule.PREFIX);
+    private static final QName QN_SORT = new QName("sort", SortModule.NAMESPACE_URI, SortModule.PREFIX);
 
     public final static FunctionSignature FNS_CREATE = new FunctionSignature(
             QN_CREATE,
             "Create a memsort index in memory",
             new SequenceType[] {
                 new FunctionParameterSequenceType("id", Type.STRING, Cardinality.EXACTLY_ONE, "The id for the index to be created"),
-                new FunctionParameterSequenceType("input", Type.NODE, Cardinality.ZERO_OR_MORE, "Existing maps to merge to create a new map"),
-                new FunctionParameterSequenceType("producer", Type.FUNCTION_REFERENCE, Cardinality.EXACTLY_ONE, "Functions which produces a memsort key for a given node")
+                new FunctionParameterSequenceType("input", Type.NODE, Cardinality.ZERO_OR_MORE, "The sequence of nodes to be sorted"),
+                new FunctionParameterSequenceType("producer", Type.FUNCTION_REFERENCE, Cardinality.EXACTLY_ONE, "Function which produces a key for a given node")
             },
             new SequenceType(Type.EMPTY, Cardinality.EMPTY)
     );
 
     public final static FunctionSignature FNS_GET = new FunctionSignature(
             QN_GET,
-            "Create a memsort index in memory",
+            "Returns an integer number corresponding to the ordinal position of the indexed node in the sorted set or the empty sequence.",
             new SequenceType[] {
-                    new FunctionParameterSequenceType("id", Type.STRING, Cardinality.EXACTLY_ONE, "The id for the index to be created"),
+                    new FunctionParameterSequenceType("id", Type.STRING, Cardinality.EXACTLY_ONE, "The id for the index to be queried"),
                     new FunctionParameterSequenceType("node", Type.NODE, Cardinality.ZERO_OR_ONE, "Existing maps to merge to create a new map")
             },
-            new SequenceType(Type.INT, Cardinality.EXACTLY_ONE)
+            new SequenceType(Type.INTEGER, Cardinality.ZERO_OR_ONE)
+    );
+
+    public final static FunctionSignature FNS_SORT = new FunctionSignature(
+            QN_SORT,
+            "Sort the given sequence of nodes based on the sort index identified by $id. Returns a map with two entries: 'sorted' contains an " +
+                    "ordered sequence of all nodes for which an entry in the sort index was found; 'unsorted' contains nodes for which no entry was found.",
+            new SequenceType[] {
+                    new FunctionParameterSequenceType("id", Type.STRING, Cardinality.EXACTLY_ONE, "The id for the index to be queried"),
+                    new FunctionParameterSequenceType("node", Type.NODE, Cardinality.ZERO_OR_MORE, "Existing maps to merge to create a new map")
+            },
+            new SequenceType(Type.MAP, Cardinality.EXACTLY_ONE)
+    );
+
+    public final static FunctionSignature FNS_CLEAR = new FunctionSignature(
+            QN_CLEAR,
+            "Clear the memsort index identified by id",
+            new SequenceType[] {
+                    new FunctionParameterSequenceType("id", Type.STRING, Cardinality.EXACTLY_ONE, "The id for the index to be cleared")
+            },
+            new SequenceType(Type.EMPTY, Cardinality.EMPTY)
     );
 
     public SortFunctions(XQueryContext context, FunctionSignature signature) {
@@ -58,17 +80,19 @@ public class SortFunctions extends BasicFunction {
     @Override
     public Sequence eval(Sequence[] args, Sequence contextSequence) throws XPathException {
         final String id = args[0].getStringValue();
-        final SortedLookupTable table = SortModule.getOrCreate(id, context.getDefaultCollator());
 
         if (isCalledAs(QN_CREATE.getLocalPart())) {
             final FunctionReference producer = (FunctionReference) args[2].itemAt(0);
-
-            table.add(args[1], producer);
-
-            return Sequence.EMPTY_SEQUENCE;
+            SortModule.create(id, context.getDefaultCollator(), args[1], producer);
         }
         if (isCalledAs(QN_GET.getLocalPart()) && !args[1].isEmpty()) {
-            return new IntegerValue(table.get((NodeProxy) args[1].itemAt(0)));
+            return SortModule.get(id).get((NodeProxy) args[1].itemAt(0));
+        }
+        if (isCalledAs(QN_CLEAR.getLocalPart())) {
+            SortModule.remove(id);
+        }
+        if (isCalledAs(QN_SORT.getLocalPart())) {
+            return SortModule.get(id).sort(args[1], context);
         }
         return Sequence.EMPTY_SEQUENCE;
     }

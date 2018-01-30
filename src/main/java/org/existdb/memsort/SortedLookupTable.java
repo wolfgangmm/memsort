@@ -22,58 +22,110 @@ package org.existdb.memsort;
 
 import com.ibm.icu.text.Collator;
 import org.exist.dom.persistent.NodeProxy;
+import org.exist.dom.persistent.NodeSet;
 import org.exist.numbering.NodeId;
 import org.exist.xquery.Constants;
 import org.exist.xquery.XPathException;
+import org.exist.xquery.XQueryContext;
+import org.exist.xquery.functions.map.MapType;
 import org.exist.xquery.value.*;
 
 import java.util.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class SortedLookupTable {
+class SortedLookupTable {
 
     private final String id;
     private final TreeMap<DocNodeId, Integer> table;
     private final Collator collator;
+    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-    public SortedLookupTable(final String id, final Collator collator) {
+    SortedLookupTable(final String id, final Collator collator) {
         this.id = id;
         table = new TreeMap<>();
         this.collator = collator;
     }
 
-    public void add(final Sequence input, final FunctionReference call) throws XPathException {
-        final List<SortItem> toBeSorted = new ArrayList<>();
-        final Sequence[] params = new Sequence[1];
-        for (final SequenceIterator nodesIter = input.iterate(); nodesIter.hasNext(); ) {
-            final NodeValue nv = (NodeValue) nodesIter.nextItem();
-            if (nv.getImplementationType() == NodeValue.IN_MEMORY_NODE)
-                throw new XPathException("Cannot create order-index on an in-memory node");
-            final NodeProxy node = (NodeProxy) nv;
-            if (call != null) {
-                // call the callback function to get value
-                params[0] = node;
-                final Sequence r = call.evalFunction(null, null, params);
-                if (!r.isEmpty()) {
-                    AtomicValue v = r.itemAt(0).atomize();
-                    if (v.getType() == Type.UNTYPED_ATOMIC) {
-                        v = v.convertTo(Type.STRING);
+    int add(final Sequence input, final FunctionReference call) throws XPathException {
+        lock.writeLock().lock();
+        try {
+            final List<SortItem> toBeSorted = new ArrayList<>();
+            final Sequence[] params = new Sequence[1];
+            for (final SequenceIterator nodesIter = input.iterate(); nodesIter.hasNext(); ) {
+                final NodeValue nv = (NodeValue) nodesIter.nextItem();
+                if (nv.getImplementationType() == NodeValue.IN_MEMORY_NODE)
+                    throw new XPathException("Cannot create order-index on an in-memory node");
+                final NodeProxy node = (NodeProxy) nv;
+                if (call != null) {
+                    // call the callback function to get value
+                    params[0] = node;
+                    final Sequence r = call.evalFunction(null, null, params);
+                    if (!r.isEmpty()) {
+                        AtomicValue v = r.itemAt(0).atomize();
+                        if (v.getType() == Type.UNTYPED_ATOMIC) {
+                            v = v.convertTo(Type.STRING);
+                        }
+                        toBeSorted.add(new SortItem(new DocNodeId(node.getDoc().getDocId(), node.getNodeId()), v));
                     }
-                    toBeSorted.add(new SortItem(new DocNodeId(node.getDoc().getDocId(), node.getNodeId()), v));
                 }
             }
-        }
-        final SortItem[] sortArray = new SortItem[toBeSorted.size()];
-        toBeSorted.toArray(sortArray);
-        Arrays.sort(sortArray);
+            final SortItem[] sortArray = new SortItem[toBeSorted.size()];
+            toBeSorted.toArray(sortArray);
+            Arrays.sort(sortArray);
 
-        for (int i = 0; i < sortArray.length; i++) {
-            final SortItem item = sortArray[i];
-            table.put(item.docNodeId, i);
+            for (int i = 0; i < sortArray.length; i++) {
+                final SortItem item = sortArray[i];
+                table.put(item.docNodeId, i);
+            }
+            return sortArray.length;
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
-    public int get(NodeProxy node) {
-        return table.getOrDefault(new DocNodeId(node.getDoc().getDocId(), node.getNodeId()), -1);
+    Sequence get(NodeProxy node) {
+        lock.readLock().lock();
+        try {
+            final Integer ord = table.get(new DocNodeId(node.getDoc().getDocId(), node.getNodeId()));
+            return ord == null ? Sequence.EMPTY_SEQUENCE : new IntegerValue(ord);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    MapType sort(final Sequence input, final XQueryContext context) throws XPathException {
+        final Sequence sorted = new ValueSequence(input.getItemCount());
+        final Sequence unsorted = new ValueSequence(input.getItemCount());
+
+        lock.readLock().lock();
+        try {
+            final List<ResultItem> toBeSorted = new ArrayList<>(input.getItemCount());
+            for (final SequenceIterator i = input.unorderedIterator(); i.hasNext(); ) {
+                final Item item = i.nextItem();
+                if (Type.subTypeOf(item.getType(), Type.NODE) && ((NodeValue) item).getImplementationType() == NodeValue.PERSISTENT_NODE) {
+                    final NodeProxy node = (NodeProxy) item;
+                    final Integer ord = table.get(new DocNodeId(node.getDoc().getDocId(), node.getNodeId()));
+                    if (ord != null) {
+                        toBeSorted.add(new ResultItem(ord, node));
+                    } else {
+                        unsorted.add(node);
+                    }
+                } else {
+                    unsorted.add(item);
+                }
+            }
+
+            toBeSorted.sort(null);
+            for (final ResultItem item : toBeSorted) {
+                sorted.add(item.item);
+            }
+        } finally {
+            lock.readLock().unlock();
+        }
+        final MapType map = new MapType(context);
+        map.add(new StringValue("sorted"), sorted);
+        map.add(new StringValue("unsorted"), unsorted);
+        return map;
     }
 
     private static class DocNodeId implements Comparable<DocNodeId> {
@@ -115,6 +167,22 @@ public class SortedLookupTable {
             } catch (XPathException e) {
                 return Constants.INFERIOR;
             }
+        }
+    }
+
+    private static class ResultItem implements Comparable<ResultItem> {
+
+        private final int ord;
+        private final Item item;
+
+        ResultItem(int ord, Item item) {
+            this.ord = ord;
+            this.item = item;
+        }
+
+        @Override
+        public int compareTo(ResultItem o) {
+            return ord > o.ord ? Constants.SUPERIOR : (ord == o.ord ? Constants.EQUAL : Constants.INFERIOR);
         }
     }
 }

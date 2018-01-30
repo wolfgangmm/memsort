@@ -8,7 +8,7 @@
     <copyright>true</copyright>
 
     <!-- should be either "application" or "library" -->
-    <type>application</type>
+    <type>library</type>
     <!-- type>library</type -->
 
     <status>stable</status>
@@ -22,8 +22,8 @@
     <!-- Collection inside /db/apps where xar-resources will be copied to -->
     <target>${package-abbrev}</target>
 
-    <prepare>pre-install.xq</prepare>
-    <finish>post-install.xq</finish>
+    <!--prepare>pre-install.xq</prepare>
+    <finish>post-install.xq</finish-->
 
     <!-- includes everything in src/main/xar-resources, README.md, and LICENSE -->
     <fileSets>
@@ -34,13 +34,13 @@
                 <include>LICENSE</include>
             </includes>
         </fileSet>
-        <fileSet>
+        <!--fileSet>
             <directory>${basedir}/src/main/xar-resources</directory>
-        </fileSet>
+        </fileSet-->
     </fileSets>
 
     <!-- include the XQuery Library modules written in XQuery from this project -->
-    <xquerySets>
+    <!--xquerySets>
         <xquerySet>
             <namespace>https://my-organisation.com/exist-db/ns/app/my-xquery-module</namespace>
             <directory>${basedir}/src/main/xquery</directory>
@@ -49,7 +49,7 @@
             </includes>
             <outputDirectory>content</outputDirectory>
         </xquerySet>
-    </xquerySets>
+    </xquerySets-->
 
     <!-- include the XQuery Library Module written in Java (JAR output) from this project -->
     <dependencySets>
@@ -63,8 +63,8 @@
     <!-- register the Java module to eXist-db -->
     <components>
         <resource>
-            <public-uri>${example.module.namespace}</public-uri>
-            <file>org.existdb.memsort.${example.module.java.classname}</file>
+            <public-uri>${module.namespace}</public-uri>
+            <file>org.existdb.memsort.${module.java.classname}</file>
         </resource>
     </components>
 

@@ -23,6 +23,9 @@ package org.existdb.memsort;
 import com.ibm.icu.text.Collator;
 import org.exist.xquery.AbstractInternalModule;
 import org.exist.xquery.FunctionDef;
+import org.exist.xquery.XPathException;
+import org.exist.xquery.value.FunctionReference;
+import org.exist.xquery.value.Sequence;
 
 import java.util.List;
 import java.util.Map;
@@ -38,18 +41,28 @@ public class SortModule extends AbstractInternalModule {
 
     public static final FunctionDef[] functions = new FunctionDef[] {
         new FunctionDef(SortFunctions.FNS_CREATE, SortFunctions.class),
-        new FunctionDef(SortFunctions.FNS_GET, SortFunctions.class)
+        new FunctionDef(SortFunctions.FNS_GET, SortFunctions.class),
+        new FunctionDef(SortFunctions.FNS_CLEAR, SortFunctions.class),
+        new FunctionDef(SortFunctions.FNS_SORT, SortFunctions.class)
     };
 
     protected final static ConcurrentSkipListMap<String, SortedLookupTable> map = new ConcurrentSkipListMap<>();
 
-    protected final static SortedLookupTable getOrCreate(final String id, final Collator collator) {
-        SortedLookupTable table = map.get(id);
-        if (table == null) {
-            table = new SortedLookupTable(id, collator);
-            map.put(id, table);
-        }
+    protected final static SortedLookupTable create(final String id, final Collator collator, final Sequence input, final FunctionReference producer)
+            throws XPathException {
+        map.remove(id);
+        final SortedLookupTable table = new SortedLookupTable(id, collator);
+        table.add(input, producer);
+        map.put(id, table);
         return table;
+    }
+
+    protected final static SortedLookupTable get(final String id) {
+        return map.get(id);
+    }
+
+    protected final static void remove(final String id) {
+        map.remove(id);
     }
 
     public SortModule(Map<String, List<?>> parameters) {
