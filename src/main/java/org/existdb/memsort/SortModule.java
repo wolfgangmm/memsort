@@ -50,7 +50,7 @@ public class SortModule extends AbstractInternalModule {
 
     protected final static SortedLookupTable create(final String id, final Collator collator, final Sequence input, final FunctionReference producer)
             throws XPathException {
-        map.remove(id);
+        // map.remove(id);
         final SortedLookupTable table = new SortedLookupTable(id, collator);
         table.add(input, producer);
         map.put(id, table);
