@@ -22,7 +22,6 @@ package org.existdb.memsort;
 
 import com.ibm.icu.text.Collator;
 import org.exist.dom.persistent.NodeProxy;
-import org.exist.dom.persistent.NodeSet;
 import org.exist.numbering.NodeId;
 import org.exist.xquery.Constants;
 import org.exist.xquery.XPathException;

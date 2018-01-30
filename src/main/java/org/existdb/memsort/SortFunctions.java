@@ -32,7 +32,7 @@ public class SortFunctions extends BasicFunction {
     private static final QName QN_CLEAR = new QName("clear", SortModule.NAMESPACE_URI, SortModule.PREFIX);
     private static final QName QN_SORT = new QName("sort", SortModule.NAMESPACE_URI, SortModule.PREFIX);
 
-    public final static FunctionSignature FNS_CREATE = new FunctionSignature(
+    final static FunctionSignature FNS_CREATE = new FunctionSignature(
             QN_CREATE,
             "Create a memsort index in memory",
             new SequenceType[] {
@@ -43,7 +43,7 @@ public class SortFunctions extends BasicFunction {
             new SequenceType(Type.EMPTY, Cardinality.EMPTY)
     );
 
-    public final static FunctionSignature FNS_GET = new FunctionSignature(
+    final static FunctionSignature FNS_GET = new FunctionSignature(
             QN_GET,
             "Returns an integer number corresponding to the ordinal position of the indexed node in the sorted set or the empty sequence.",
             new SequenceType[] {
@@ -53,7 +53,7 @@ public class SortFunctions extends BasicFunction {
             new SequenceType(Type.INTEGER, Cardinality.ZERO_OR_ONE)
     );
 
-    public final static FunctionSignature FNS_SORT = new FunctionSignature(
+    final static FunctionSignature FNS_SORT = new FunctionSignature(
             QN_SORT,
             "Sort the given sequence of nodes based on the sort index identified by $id. Returns a map with two entries: 'sorted' contains an " +
                     "ordered sequence of all nodes for which an entry in the sort index was found; 'unsorted' contains nodes for which no entry was found.",
@@ -64,7 +64,7 @@ public class SortFunctions extends BasicFunction {
             new SequenceType(Type.MAP, Cardinality.EXACTLY_ONE)
     );
 
-    public final static FunctionSignature FNS_CLEAR = new FunctionSignature(
+    final static FunctionSignature FNS_CLEAR = new FunctionSignature(
             QN_CLEAR,
             "Clear the memsort index identified by id",
             new SequenceType[] {
@@ -85,14 +85,18 @@ public class SortFunctions extends BasicFunction {
             final FunctionReference producer = (FunctionReference) args[2].itemAt(0);
             SortModule.create(id, context.getDefaultCollator(), args[1], producer);
         }
-        if (isCalledAs(QN_GET.getLocalPart()) && !args[1].isEmpty()) {
-            return SortModule.get(id).get((NodeProxy) args[1].itemAt(0));
-        }
         if (isCalledAs(QN_CLEAR.getLocalPart())) {
             SortModule.remove(id);
         }
+        final SortedLookupTable table = SortModule.get(id);
+        if (table == null) {
+            throw new XPathException(this, ErrorCodes.ERROR, "Sort table not found for id: " + id);
+        }
+        if (isCalledAs(QN_GET.getLocalPart()) && !args[1].isEmpty()) {
+            return table.get((NodeProxy) args[1].itemAt(0));
+        }
         if (isCalledAs(QN_SORT.getLocalPart())) {
-            return SortModule.get(id).sort(args[1], context);
+            return table.sort(args[1], context);
         }
         return Sequence.EMPTY_SEQUENCE;
     }
