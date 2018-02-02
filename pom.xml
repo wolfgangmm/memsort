@@ -16,12 +16,12 @@
     <version>1.0-SNAPSHOT</version>
 
     <name>Memsort XQuery Module</name>
-    <description>Maintain sorted node sets in memory</description>
-    <url>https://my-organisation.com/exist-db/app</url>
+    <description>Cache pre-ordered node sets in memory</description>
+    <url>https://github.com/wolfgangmm/memsort</url>
 
     <organization>
-        <name>My Organisation</name>
-        <url>http://my-organisation.com</url>
+        <name>eXistdb</name>
+        <url>http://exist-db.org</url>
     </organization>
 
     <licenses>
@@ -33,14 +33,14 @@
     </licenses>
 
     <scm>
-        <url>https://www.github.com/my-organisation/example-exist-app.git</url>
-        <connection>scm:git:https://www.github.com/my-organisation/example-exist-app.git</connection>
-        <developerConnection>scm:git:https://www.github.com/my-organisation/example-exist-app.git</developerConnection>
+        <url>git@github.com:wolfgangmm/memsort.git</url>
+        <connection>scm:git:https://github.com/wolfgangmm/memsort.git</connection>
+        <developerConnection>scm:git:https://github.com/wolfgangmm/memsort.git</developerConnection>
     </scm>
 
     <issueManagement>
         <system>GitHub</system>
-        <url>https://www.github.com/my-organisation/example-exist-app/issues</url>
+        <url>https://github.com/wolfgangmm/memsort/issues</url>
     </issueManagement>
 
     <properties>

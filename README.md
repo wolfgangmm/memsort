@@ -1,44 +1,38 @@
-# Example App for eXist-db
+# Pre-order and cache sequences for sorting
+This module allows you to create a pre-sorted sequence in memory to speed up sorting via
+"order by" in XQuery. Create an ordered sequence using `memsort:create` by mapping each element
+to a sort key (an arbitrary atomic value). Calling `memsort:get` for the same element at any later
+point will return an integer corresponding to the ordinal position of that element in the sorted
+sequence (or empty if no mapping is found).
 
-This is a simple skeleton Example App for eXist-db which will be built as an EXPath Package using Maven.
+Example for creating a sorted sequence:
 
-You can use this as a base for your own eXist-db Apps or Libraries.
+```xquery
+declare namespace tei="http://www.tei-c.org/ns/1.0";
 
+import module namespace memsort="http://exist-db.org/xquery/memsort" at "java:org.existdb.memsort.SortModule";
 
-The App contains:
- 
-1. An example XQuery Library Module of user defined functions written in Java.
+memsort:create(
+    "record-date", 
+    collection("/db/apps/my-data")//record,
+    function($div) {
+        $div/@date/xs:dateTime(.)
+    }
+)
+```
 
-2. A example XQuery Library Module of user defined functions written in XQuery.
+Example for using the index in a query, assuming `$hits` are records returned by a lucene full text search:
 
-3. A simple Web landing page for the app itself.   
+```xquery
+for $hit in $hits
+order by memsort:get("record-date", $hit) ascending empty greatest, ft:score($hit) descending
+return
+    $hit
+```
 
+This will first sort by date, then by full text match score. Records without date will appear at the end (due to "empty greatest").
 
-
-1. By default the project is setup for an LGPL 2.1 licensing scheme. You should decide if that is appropriate and if not, make the following modifications:
-
-  1. Modify the `licenses` section in `pom.xml`.
-  
-  2. Override the `configuration` of the license-maven-plugin` in `pom.xml`. See: http://code.mycila.com/license-maven-plugin/
-  
-  3. Potentially remove or replace `LGPL2.1-template.txt`.
-  
-  4. Run `mvn license:check` and `mvn license:format` appropriately. 
-
-1. You should modify the `pom.xml` changing at least the `groupId` and `artifactId` to coordinates that are suitable for your organisation.
-
-2. You should modify, remove, or append to, the files in:
-
-  * `src/main/java` for any XQuery library modules written in Java.
-
-  * `src/main/xquery` for any XQUery library modules written in Java.
-
-  * `src/main/xar-resources` for any static files or XQuery modules that are shipped as part of your app. 
-
-NOTE: You will also need to modify `xar-assembly.xml` to reflect any changes you make to user defined XQuery library modules (whether written in Java or XQuery).
-
-
-* Requirements: Java 8, Apache Maven 3.3+, Git.
+## Building
 
 If you want to create an EXPath Package for the app, you can run:
 
@@ -47,17 +41,3 @@ $ mvn package
 ```
 
 There will be a `.xar` file in the `target/` sub-folder.
-
-
-You can use the Maven Release plugin to publish your applications **publicly** to Maven Central.
-
-1. You need to register to manage the `groupId` of your organisation on Maven Central, see: http://central.sonatype.org/pages/ossrh-guide.html#create-a-ticket-with-sonatype
-
-2. Assuming your Git repo is in-sync, you can simply run the following to upload to Sonatype OSS:
-
-```bash
-$ mvn release:prepare
-$ mvn release:perform
-```
-
-3. You need to release the artifacts on the Sonatype OSS web portal, see: http://central.sonatype.org/pages/ossrh-guide.html#releasing-to-central
